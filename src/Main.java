@@ -58,7 +58,7 @@ public class Main {
         deleteTaskButton = new JButton("Delete Selected");
     }
 
-    public static void main(String[] args) {
+    static void main() {
         SwingUtilities.invokeLater(() -> {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -79,7 +79,7 @@ public class Main {
         frame.setMinimumSize(new Dimension(760, 420));
         frame.addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing(WindowEvent event) {
+            public void windowClosing(WindowEvent ignoredEvent) {
                 saveTodoListsAndExit(frame);
             }
         });
@@ -93,17 +93,17 @@ public class Main {
         taskList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         taskInput.setToolTipText("Enter a task");
 
-        addTodoListButton.addActionListener(event -> addTodoList(frame));
-        deleteTodoListButton.addActionListener(event -> deleteSelectedTodoList(frame));
+        addTodoListButton.addActionListener(_ -> addTodoList(frame));
+        deleteTodoListButton.addActionListener(_ -> deleteSelectedTodoList(frame));
         todoListNames.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting() && !changingListSelection) {
                 switchTodoList(todoListNames.getSelectedValue());
             }
         });
 
-        addTaskButton.addActionListener(event -> addTask());
-        taskInput.addActionListener(event -> addTask());
-        deleteTaskButton.addActionListener(event -> deleteSelectedTasks());
+        addTaskButton.addActionListener(_ -> addTask());
+        taskInput.addActionListener(_ -> addTask());
+        deleteTaskButton.addActionListener(_ -> deleteSelectedTasks());
 
         JPanel mainPanel = new JPanel(new BorderLayout(16, 0));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
@@ -221,13 +221,17 @@ public class Main {
             return;
         }
 
-        changingListSelection = true;
         int selectedIndex = todoListNames.getSelectedIndex();
-        todoLists.remove(selectedList);
-        todoListNameModel.removeElement(selectedList);
-        currentListName = null;
-        taskListModel.clear();
-        changingListSelection = false;
+
+        changingListSelection = true;
+        try {
+            todoLists.remove(selectedList);
+            todoListNameModel.removeElement(selectedList);
+            currentListName = null;
+            taskListModel.clear();
+        } finally {
+            changingListSelection = false;
+        }
 
         if (!todoListNameModel.isEmpty()) {
             int nextIndex = Math.min(selectedIndex, todoListNameModel.size() - 1);
@@ -251,7 +255,13 @@ public class Main {
     private void loadCurrentTasksIntoEditor() {
         taskListModel.clear();
 
-        for (String task : todoLists.getOrDefault(currentListName, new ArrayList<>())) {
+        List<String> tasks = todoLists.get(currentListName);
+
+        if (tasks == null) {
+            return;
+        }
+
+        for (String task : tasks) {
             taskListModel.addElement(task);
         }
 
@@ -323,11 +333,11 @@ public class Main {
             while ((line = reader.readLine()) != null) {
                 List<String> fields = parseCsvLine(line);
 
-                if (fields.isEmpty() || fields.get(0).isBlank()) {
+                if (fields.isEmpty() || fields.getFirst().isBlank()) {
                     continue;
                 }
 
-                String listName = fields.get(0);
+                String listName = fields.getFirst();
                 todoLists.putIfAbsent(listName, new ArrayList<>());
 
                 if (fields.size() > 1 && !fields.get(1).isBlank()) {
@@ -353,8 +363,8 @@ public class Main {
             while ((line = reader.readLine()) != null) {
                 List<String> fields = parseCsvLine(line);
 
-                if (!fields.isEmpty() && !fields.get(0).isBlank()) {
-                    defaultTasks.add(fields.get(0));
+                if (!fields.isEmpty() && !fields.getFirst().isBlank()) {
+                    defaultTasks.add(fields.getFirst());
                 }
             }
         } catch (IOException exception) {
@@ -405,17 +415,21 @@ public class Main {
         }
     }
 
-    private String toCsvLine(String... values) {
-        List<String> escapedValues = new ArrayList<>();
+    private static String toCsvLine(String... values) {
+        StringBuilder csvLine = new StringBuilder();
 
-        for (String value : values) {
-            escapedValues.add("\"" + value.replace("\"", "\"\"") + "\"");
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                csvLine.append(',');
+            }
+
+            csvLine.append('"').append(values[i].replace("\"", "\"\"")).append('"');
         }
 
-        return String.join(",", escapedValues);
+        return csvLine.toString();
     }
 
-    private List<String> parseCsvLine(String line) {
+    private static List<String> parseCsvLine(String line) {
         List<String> fields = new ArrayList<>();
         StringBuilder currentField = new StringBuilder();
         boolean insideQuotes = false;
