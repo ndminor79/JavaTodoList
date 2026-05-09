@@ -30,7 +30,9 @@ import java.util.List;
 import java.util.Map;
 
 public class Main {
-    private static final Path TODO_LISTS_FILE = Path.of("todo-lists.csv");
+    private static final Path DATA_DIRECTORY = Path.of(System.getProperty("user.home"), "TodoList");
+    private static final Path TODO_LISTS_FILE = DATA_DIRECTORY.resolve("todo-lists.csv");
+    private static final Path LOCAL_TODO_LISTS_FILE = Path.of("todo-lists.csv");
     private static final Path OLD_TASKS_FILE = Path.of("tasks.csv");
     private static final String DEFAULT_LIST_NAME = "Default";
 
@@ -312,7 +314,9 @@ public class Main {
         todoListNameModel.clear();
 
         if (Files.exists(TODO_LISTS_FILE)) {
-            loadTodoListsFromCurrentFile();
+            loadTodoListsFromFile(TODO_LISTS_FILE);
+        } else if (Files.exists(LOCAL_TODO_LISTS_FILE)) {
+            loadTodoListsFromFile(LOCAL_TODO_LISTS_FILE);
         } else if (Files.exists(OLD_TASKS_FILE)) {
             loadOldTasksFile();
         }
@@ -326,8 +330,8 @@ public class Main {
         }
     }
 
-    private void loadTodoListsFromCurrentFile() {
-        try (BufferedReader reader = Files.newBufferedReader(TODO_LISTS_FILE)) {
+    private void loadTodoListsFromFile(Path todoListsFile) {
+        try (BufferedReader reader = Files.newBufferedReader(todoListsFile)) {
             String line;
 
             while ((line = reader.readLine()) != null) {
@@ -347,7 +351,7 @@ public class Main {
         } catch (IOException exception) {
             JOptionPane.showMessageDialog(
                     null,
-                    "Could not load saved lists from " + TODO_LISTS_FILE + ".",
+                    "Could not load saved lists from " + todoListsFile + ".",
                     "Load Error",
                     JOptionPane.ERROR_MESSAGE
             );
@@ -396,6 +400,8 @@ public class Main {
     }
 
     private void saveTodoLists() throws IOException {
+        Files.createDirectories(DATA_DIRECTORY);
+
         try (BufferedWriter writer = Files.newBufferedWriter(TODO_LISTS_FILE)) {
             for (Map.Entry<String, List<String>> entry : todoLists.entrySet()) {
                 String listName = entry.getKey();
