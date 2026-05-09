@@ -30,12 +30,16 @@ import java.util.List;
 import java.util.Map;
 
 public class Main {
+    // Saved list data is kept under the user's home directory, with local files
+    // still supported for projects created before the app-level data directory.
     private static final Path DATA_DIRECTORY = Path.of(System.getProperty("user.home"), "TodoList");
     private static final Path TODO_LISTS_FILE = DATA_DIRECTORY.resolve("todo-lists.csv");
     private static final Path LOCAL_TODO_LISTS_FILE = Path.of("todo-lists.csv");
     private static final Path OLD_TASKS_FILE = Path.of("tasks.csv");
     private static final String DEFAULT_LIST_NAME = "Default";
 
+    // The map is the source of truth for all saved lists; the list models mirror
+    // the currently visible Swing controls.
     private final Map<String, List<String>> todoLists;
     private final DefaultListModel<String> todoListNameModel;
     private final DefaultListModel<String> taskListModel;
@@ -48,6 +52,10 @@ public class Main {
     private String currentListName;
     private boolean changingListSelection;
 
+    /**
+     * Builds the shared application state and Swing components used throughout
+     * the to-do list window.
+     */
     public Main() {
         todoLists = new LinkedHashMap<>();
         todoListNameModel = new DefaultListModel<>();
@@ -60,6 +68,10 @@ public class Main {
         deleteTaskButton = new JButton("Delete Selected");
     }
 
+    /**
+     * Starts the Swing application on the event dispatch thread so UI updates
+     * happen on Swing's expected thread.
+     */
     static void main() {
         SwingUtilities.invokeLater(() -> {
             try {
@@ -73,6 +85,10 @@ public class Main {
         });
     }
 
+    /**
+     * Loads saved data, wires the main window actions, and displays the primary
+     * two-panel to-do list interface.
+     */
     private void createAndShowUI() {
         loadTodoLists();
 
@@ -123,6 +139,10 @@ public class Main {
         }
     }
 
+    /**
+     * Creates the left sidebar that shows all to-do lists and list management
+     * controls.
+     */
     private JPanel createTodoListsPanel(JButton addTodoListButton, JButton deleteTodoListButton) {
         JLabel listLabel = new JLabel("Lists");
         listLabel.setFont(listLabel.getFont().deriveFont(Font.BOLD, 18f));
@@ -148,6 +168,9 @@ public class Main {
         return panel;
     }
 
+    /**
+     * Creates the main task editor panel for the selected to-do list.
+     */
     private JPanel createTasksPanel() {
         JPanel inputPanel = new JPanel(new BorderLayout(8, 0));
         inputPanel.add(taskInput, BorderLayout.CENTER);
@@ -182,6 +205,10 @@ public class Main {
         return panel;
     }
 
+    /**
+     * Prompts for a new list name, validates it, and switches to the new empty
+     * list after saving the current visible tasks.
+     */
     private void addTodoList(JFrame frame) {
         String name = JOptionPane.showInputDialog(frame, "List name:", "New To-Do List", JOptionPane.PLAIN_MESSAGE);
 
@@ -205,6 +232,10 @@ public class Main {
         todoListNames.setSelectedValue(name, true);
     }
 
+    /**
+     * Confirms deletion of the selected list, removes its tasks, and selects the
+     * next available list when possible.
+     */
     private void deleteSelectedTodoList(JFrame frame) {
         String selectedList = todoListNames.getSelectedValue();
 
@@ -243,6 +274,10 @@ public class Main {
         }
     }
 
+    /**
+     * Persists the current editor contents in memory before loading a different
+     * list into the task editor.
+     */
     private void switchTodoList(String nextListName) {
         if (nextListName == null || nextListName.equals(currentListName)) {
             return;
@@ -254,6 +289,9 @@ public class Main {
         updateTaskControls();
     }
 
+    /**
+     * Copies the selected list's stored tasks into the visible task list model.
+     */
     private void loadCurrentTasksIntoEditor() {
         taskListModel.clear();
 
@@ -270,6 +308,9 @@ public class Main {
         currentListLabel.setText(currentListName);
     }
 
+    /**
+     * Adds the text field contents as a task for the currently selected list.
+     */
     private void addTask() {
         String task = taskInput.getText().trim();
 
@@ -280,6 +321,10 @@ public class Main {
         }
     }
 
+    /**
+     * Removes all selected tasks from the visible model, walking backward so
+     * earlier removals do not shift later selected indices.
+     */
     private void deleteSelectedTasks() {
         int[] selectedIndices = taskList.getSelectedIndices();
 
@@ -288,6 +333,10 @@ public class Main {
         }
     }
 
+    /**
+     * Copies the visible tasks back into the in-memory list map before switching
+     * lists or saving to disk.
+     */
     private void saveCurrentTasksToMemory() {
         if (currentListName == null) {
             return;
@@ -301,6 +350,9 @@ public class Main {
         todoLists.put(currentListName, tasks);
     }
 
+    /**
+     * Enables or disables task editing based on whether a to-do list is selected.
+     */
     private void updateTaskControls() {
         boolean hasSelectedList = currentListName != null;
         currentListLabel.setText(hasSelectedList ? currentListName : "No List Selected");
@@ -309,6 +361,10 @@ public class Main {
         deleteTaskButton.setEnabled(hasSelectedList);
     }
 
+    /**
+     * Loads saved to-do lists, falling back to older local file formats and then
+     * to a default empty list if no saved data exists.
+     */
     private void loadTodoLists() {
         todoLists.clear();
         todoListNameModel.clear();
@@ -330,6 +386,10 @@ public class Main {
         }
     }
 
+    /**
+     * Reads the current CSV storage format where each row contains a list name
+     * and one task from that list.
+     */
     private void loadTodoListsFromFile(Path todoListsFile) {
         try (BufferedReader reader = Files.newBufferedReader(todoListsFile)) {
             String line;
@@ -358,6 +418,9 @@ public class Main {
         }
     }
 
+    /**
+     * Imports the legacy single-list task file into the default list.
+     */
     private void loadOldTasksFile() {
         List<String> defaultTasks = new ArrayList<>();
 
@@ -383,6 +446,10 @@ public class Main {
         todoLists.put(DEFAULT_LIST_NAME, defaultTasks);
     }
 
+    /**
+     * Saves the current editor state and exits only after the data is written
+     * successfully.
+     */
     private void saveTodoListsAndExit(JFrame frame) {
         try {
             saveCurrentTasksToMemory();
@@ -399,6 +466,10 @@ public class Main {
         }
     }
 
+    /**
+     * Writes every list and task to disk, keeping empty lists as rows with blank
+     * task values so they are restored on the next launch.
+     */
     private void saveTodoLists() throws IOException {
         Files.createDirectories(DATA_DIRECTORY);
 
@@ -421,6 +492,9 @@ public class Main {
         }
     }
 
+    /**
+     * Converts values to a simple quoted CSV row, escaping quotes inside values.
+     */
     private static String toCsvLine(String... values) {
         StringBuilder csvLine = new StringBuilder();
 
@@ -435,6 +509,10 @@ public class Main {
         return csvLine.toString();
     }
 
+    /**
+     * Parses one CSV row produced by {@link #toCsvLine(String...)} while handling
+     * quoted commas and escaped quote characters.
+     */
     private static List<String> parseCsvLine(String line) {
         List<String> fields = new ArrayList<>();
         StringBuilder currentField = new StringBuilder();
